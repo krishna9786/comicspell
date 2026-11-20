@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     let result;
 
     if (all === 'true') {
+      const { userId } = getAuth(request);
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
       // Admin dashboard fetches all drafts + published posts
       result = await pool.query(`SELECT * FROM posts ORDER BY id DESC`);
     } else if (spotlight === 'true') {
@@ -101,7 +105,7 @@ export async function POST(req: NextRequest) {
     const publishedFlag =
       typeof is_published === 'boolean' ? is_published : status === 'published';
 
-  const query = `
+    const query = `
       INSERT INTO posts (
         title, slug, short_description, author, published_on,
         image_url, image_credit, category, content, is_published, safety_status, clerk_id

@@ -54,8 +54,10 @@ export default function Home() {
         if (response.ok) {
           const data = await response.json();
           const posts = Array.isArray(data) ? data : data.posts || [];
-          
-          setSpotlightItems(posts.filter((p: any) => p.is_spotlight || p.isSpotlight).slice(0, 5));
+
+          const featured = posts.filter((p: any) => p.is_spotlight || p.isSpotlight).slice(0, 5);
+          setSpotlightItems(featured);
+          setCurrentIndex(0);
           setRepeaterArticles(posts);
         }
       } catch (error) {
@@ -90,6 +92,7 @@ export default function Home() {
   };
 
   const currentItem = spotlightItems[currentIndex];
+  const currentItemImage = currentItem?.image_url || currentItem?.image || currentItem?.imageUrl;
 
   return (
     <main className="flex min-h-screen flex-col bg-black text-white relative">
@@ -101,19 +104,19 @@ export default function Home() {
             <div className="h-[390px] md:h-[550px] flex items-center justify-center text-zinc-500 text-sm">
               Loading spotlight...
             </div>
-          ) : spotlightItems.length === 0 ? (
+          ) : !currentItem ? (
             <div className="h-[390px] md:h-[550px] flex items-center justify-center text-zinc-500 text-sm">
               No featured articles available. Publish an article with spotlight enabled to see it here.
             </div>
           ) : (
-            <div 
-              className="h-[390px] md:h-[550px] bg-cover bg-center flex flex-col justify-end p-8 md:p-12 relative transition-all duration-700 ease-in-out" 
-              style={{ backgroundImage: `url('${currentItem.image_url || currentItem.image || currentItem.imageUrl}')` }}
+            <div
+              className="h-[390px] md:h-[550px] bg-cover bg-center flex flex-col justify-end p-8 md:p-12 relative transition-all duration-700 ease-in-out"
+              style={{ backgroundImage: currentItemImage ? `url('${currentItemImage}')` : undefined }}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
 
               <div className="relative z-10">
-                <a 
+                <a
                   href={currentItem.categorySlug || `/category/${currentItem.category?.toLowerCase()}`}
                   className="text-xs bg-[#b5ff42] text-black font-bold px-2.5 py-1 rounded mb-3 inline-block hover:opacity-90 transition"
                 >
@@ -122,22 +125,22 @@ export default function Home() {
                 <h2 className="text-2xl md:text-4xl font-extrabold text-white max-w-3xl leading-tight">
                   {currentItem.title}
                 </h2>
-                <a 
-                  href={currentItem.slug ? `/posts/${currentItem.slug}` : `/posts/${currentItem.id}`} 
+                <a
+                  href={currentItem.slug ? `/posts/${currentItem.slug}` : `/posts/${currentItem.id}`}
                   className="mt-4 inline-block bg-[#22c55e] text-black font-semibold text-sm px-6 py-2.5 rounded-full hover:bg-[#16a34a] transition"
                 >
                   Read More
                 </a>
               </div>
 
-              <button 
-                onClick={handlePrev} 
+              <button
+                onClick={handlePrev}
                 className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-3 rounded-full hover:bg-black transition z-20 cursor-pointer"
               >
                 &#10094;
               </button>
-              <button 
-                onClick={handleNext} 
+              <button
+                onClick={handleNext}
                 className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-3 rounded-full hover:bg-black transition z-20 cursor-pointer"
               >
                 &#10095;
@@ -194,64 +197,73 @@ export default function Home() {
             ) : repeaterArticles.length === 0 ? (
               <div className="text-zinc-500 text-sm py-10">No articles found. Publish a post from your admin dashboard to see it appear here!</div>
             ) : (
-              repeaterArticles.map((article) => (
-                <div
-                  key={article.id || article._id}
-                  className="group flex flex-col md:flex-row bg-[#121212] rounded-2xl overflow-hidden border border-zinc-800 shadow-[0_12px_24px_-4px_rgba(39,39,42,0.7)] transform transition-all duration-300 hover:scale-[1.02] hover:border-zinc-700 hover:shadow-[0_20px_40px_-4px_rgba(45,45,48,0.9)]"
-                >
-                  {/* Article Thumbnail */}
-                  <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="md:w-[42%] h-64 md:h-auto relative overflow-hidden shrink-0 block">
-                    <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                      style={{ backgroundImage: `url('${article.image_url || article.image || article.imageUrl}')` }}
-                    ></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:hidden"></div>
-                  </Link>
+              repeaterArticles.map((article) => {
+                const postImage = article.image_url || article.image || article.imageUrl;
+                const postDate = article.published_on
+                  ? new Date(article.published_on).toLocaleDateString('en-GB')
+                  : article.date || (article.created_at ? new Date(article.created_at).toLocaleDateString() : '');
 
-                  {/* Article Content */}
-                  <div className="flex flex-col justify-between p-6 md:p-8 md:w-[58%]">
-                    <div>
-                      {/* Category & Date Header */}
-                      <div className="flex justify-between items-center text-xs mb-3">
-                        <Link 
-                          href={article.categorySlug || `/category/${article.category?.toLowerCase()}`} 
-                          className="text-[#22c55e] font-bold tracking-wide uppercase hover:underline z-10 relative"
-                        >
-                          {article.category}
+                return (
+                  <div
+                    key={article.id || article._id}
+                    className="group flex flex-col md:flex-row bg-[#121212] rounded-2xl overflow-hidden border border-zinc-800 shadow-[0_12px_24px_-4px_rgba(39,39,42,0.7)] transform transition-all duration-300 hover:scale-[1.02] hover:border-zinc-700 hover:shadow-[0_20px_40px_-4px_rgba(45,45,48,0.9)]"
+                  >
+                    {/* Article Thumbnail */}
+                    <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="md:w-[42%] h-64 md:h-auto relative overflow-hidden shrink-0 block bg-zinc-900">
+                      {postImage && (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                          style={{ backgroundImage: `url('${postImage}')` }}
+                        ></div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:hidden"></div>
+                    </Link>
+
+                    {/* Article Content */}
+                    <div className="flex flex-col justify-between p-6 md:p-8 md:w-[58%]">
+                      <div>
+                        {/* Category & Date Header */}
+                        <div className="flex justify-between items-center text-xs mb-3">
+                          <Link
+                            href={article.categorySlug || `/category/${article.category?.toLowerCase()}`}
+                            className="text-[#22c55e] font-bold tracking-wide uppercase hover:underline z-10 relative"
+                          >
+                            {article.category}
+                          </Link>
+                          <span className="text-zinc-400">
+                            {postDate}
+                          </span>
+                        </div>
+
+                        {/* Title */}
+                        <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="block">
+                          <h3 className="text-xl md:text-2xl font-bold text-white mb-3 group-hover:text-[#b5ff42] transition-colors leading-snug">
+                            {article.title}
+                          </h3>
                         </Link>
-                        <span className="text-zinc-400">
-                          {article.date || (article.created_at ? new Date(article.created_at).toLocaleDateString() : '')}
-                        </span>
+
+                        {/* Description */}
+                        <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="block">
+                          <p className="text-zinc-400 text-sm leading-relaxed mb-6">
+                            {article.short_description || article.description || article.excerpt}
+                          </p>
+                        </Link>
                       </div>
 
-                      {/* Title */}
-                      <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="block">
-                        <h3 className="text-xl md:text-2xl font-bold text-white mb-3 group-hover:text-[#b5ff42] transition-colors leading-snug">
-                          {article.title}
-                        </h3>
-                      </Link>
-
-                      {/* Description */}
-                      <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="block">
-                        <p className="text-zinc-400 text-sm leading-relaxed mb-6">
-                          {article.description || article.excerpt}
-                        </p>
-                      </Link>
-                    </div>
-
-                    {/* Author Info */}
-                    <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
-                      Authored By:{' '}
-                      <Link 
-                        href={article.authorSlug || '#'} 
-                        className="text-zinc-200 font-medium hover:text-[#b5ff42] transition-colors z-10 relative"
-                      >
-                        {article.author || 'Admin'}
-                      </Link>
+                      {/* Author Info */}
+                      <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
+                        Authored By:{' '}
+                        <Link
+                          href={article.authorSlug || '#'}
+                          className="text-zinc-200 font-medium hover:text-[#b5ff42] transition-colors z-10 relative"
+                        >
+                          {article.author || 'Admin'}
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

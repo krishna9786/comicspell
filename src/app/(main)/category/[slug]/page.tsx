@@ -46,22 +46,15 @@ export default function CategoryDynamicPage() {
   const [articles, setArticles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch live articles and filter by category
+  // Fetch live articles filtered by category
   useEffect(() => {
     async function fetchCategoryArticles() {
       try {
-        const response = await fetch('/api/posts');
+        const response = await fetch(`/api/posts?category=${encodeURIComponent(meta.title)}`);
         if (response.ok) {
           const data = await response.json();
           const posts = Array.isArray(data) ? data : data.posts || [];
-          
-          // Filter posts that match the current category slug
-          const filtered = posts.filter((post: any) => {
-            const postCategorySlug = post.categorySlug || `/category/${post.category?.toLowerCase()}`.replace(/\s+/g, '-');
-            return postCategorySlug.includes(slug) || post.category?.toLowerCase() === meta.title.toLowerCase();
-          });
-
-          setArticles(filtered);
+          setArticles(posts);
         }
       } catch (error) {
         console.error('Failed to fetch category articles:', error);
@@ -77,10 +70,9 @@ export default function CategoryDynamicPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-black text-white relative">
-    
       {/* Category Hero Banner */}
       <section className="px-6 pt-10 pb-6 flex justify-center">
-        <div 
+        <div
           className="w-full max-w-7xl h-[300px] md:h-[400px] bg-cover bg-center rounded-2xl overflow-hidden relative flex flex-col justify-end p-8 md:p-12 shadow-2xl border border-zinc-800"
           style={{ backgroundImage: `url('${meta.image}')` }}
         >
@@ -106,46 +98,59 @@ export default function CategoryDynamicPage() {
             {isLoading ? (
               <div className="text-zinc-500 py-12 text-center">Loading articles...</div>
             ) : articles.length > 0 ? (
-              articles.map((article) => (
-                <div
-                  key={article.id || article._id}
-                  className="group flex flex-col md:flex-row bg-[#121212] rounded-2xl overflow-hidden border border-zinc-800 shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                >
-                  <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="md:w-[42%] h-64 md:h-auto relative overflow-hidden shrink-0 block">
-                    <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                      style={{ backgroundImage: `url('${article.image || article.imageUrl}')` }}
-                    ></div>
-                  </Link>
-                  <div className="flex flex-col justify-between p-6 md:p-8 md:w-[58%]">
-                    <div>
-                      <div className="flex justify-between items-center text-xs mb-3">
-                        <span className="text-[#22c55e] font-bold tracking-wide uppercase">
-                          {meta.title}
-                        </span>
-                        <span className="text-zinc-400">
-                          {article.date || (article.created_at ? new Date(article.created_at).toLocaleDateString() : '')}
-                        </span>
+              articles.map((article) => {
+                const postImage = article.image_url || article.image || article.imageUrl;
+                const postDate = article.published_on
+                  ? new Date(article.published_on).toLocaleDateString('en-GB')
+                  : article.date || '';
+                const postHref = article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`;
+
+                return (
+                  <div
+                    key={article.id || article._id}
+                    className="group flex flex-col md:flex-row bg-[#121212] rounded-2xl overflow-hidden border border-zinc-800 shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                  >
+                    <Link href={postHref} className="md:w-[42%] h-64 md:h-auto relative overflow-hidden shrink-0 block bg-zinc-900">
+                      {postImage && (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                          style={{ backgroundImage: `url('${postImage}')` }}
+                        ></div>
+                      )}
+                    </Link>
+                    <div className="flex flex-col justify-between p-6 md:p-8 md:w-[58%]">
+                      <div>
+                        <div className="flex justify-between items-center text-xs mb-3">
+                          <span className="text-[#22c55e] font-bold tracking-wide uppercase">
+                            {meta.title}
+                          </span>
+                          <span className="text-zinc-400">{postDate}</span>
+                        </div>
+                        <Link href={postHref} className="block">
+                          <h3 className="text-xl md:text-2xl font-bold text-white mb-3 group-hover:text-[#b5ff42] transition-colors leading-snug">
+                            {article.title}
+                          </h3>
+                        </Link>
+                        <p className="text-zinc-400 text-sm leading-relaxed mb-6">
+                          {article.short_description || article.description || article.excerpt}
+                        </p>
                       </div>
-                      <Link href={article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`} className="block">
-                        <h3 className="text-xl md:text-2xl font-bold text-white mb-3 group-hover:text-[#b5ff42] transition-colors leading-snug">
-                          {article.title}
-                        </h3>
-                      </Link>
-                      <p className="text-zinc-400 text-sm leading-relaxed mb-6">
-                        {article.description || article.excerpt}
-                      </p>
-                    </div>
-                    <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
-                      Authored By: <Link href={article.authorSlug || '#'} className="text-zinc-200 font-medium hover:text-[#b5ff42]">{article.author || 'Admin'}</Link>
+                      <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
+                        Authored By:{' '}
+                        <Link href={article.authorSlug || '#'} className="text-zinc-200 font-medium hover:text-[#b5ff42]">
+                          {article.author || 'Admin'}
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-zinc-500 py-12 text-center bg-[#121212] rounded-2xl border border-zinc-800 w-full">
                 <p className="text-base font-semibold text-zinc-300">No articles found in this category yet.</p>
-                <p className="text-xs text-zinc-500 mt-1">Publish an article from your admin dashboard with this category to see it appear here!</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Publish an article from your admin dashboard with this category to see it appear here!
+                </p>
               </div>
             )}
           </div>

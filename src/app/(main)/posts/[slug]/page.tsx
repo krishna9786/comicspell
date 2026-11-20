@@ -2,58 +2,148 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth, useUser } from '@clerk/nextjs';
 import React from 'react';
+
+const DEFAULT_HERO_IMAGE =
+  'https://images.unsplash.com/photo-1635863138275-d9b33297680b?q=80&w=1600&auto=format&fit=crop';
 
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = React.use(params);
   const slug = resolvedParams.slug;
 
-  const formattedTitle = slug
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  const router = useRouter();
+  const pathname = usePathname();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
 
+  const requireLogin = () => {
+    if (!isLoaded) return true;
+    if (!isSignedIn) {
+      const returnUrl = encodeURIComponent(pathname || `/posts/${slug}`);
+      router.push(`/sign-in?redirect_url=${returnUrl}`);
+      return true;
+    }
+    return false;
+  };
+
+  const [post, setPost] = useState<any>(null);
+  const [isLoadingPost, setIsLoadingPost] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPost() {
+      try {
+        const res = await fetch('/api/posts');
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : data.posts || [];
+          const found = list.find(
+            (item: any) =>
+              String(item.slug) === String(slug) || String(item.id) === String(slug)
+          );
+          if (active) {
+            setPost(found || null);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load post:', err);
+      } finally {
+        if (active) {
+          setIsLoadingPost(false);
+        }
+      }
+    }
+
+    if (slug) {
+      loadPost();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  const formattedTitle =
+    post?.title ||
+    slug
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+  const lowerCat = (post?.category || '').toLowerCase();
   const lowerSlug = slug.toLowerCase();
-  const isDC = lowerSlug.includes('batman') || lowerSlug.includes('dc') || lowerSlug.includes('superman');
-  const isAnime = lowerSlug.includes('anime') || lowerSlug.includes('one-piece') || lowerSlug.includes('naruto') || lowerSlug.includes('jujutsu');
-  const isKDrama = lowerSlug.includes('kdrama') || lowerSlug.includes('k-drama') || lowerSlug.includes('oppa');
+  const isDC =
+    lowerCat.includes('dc') ||
+    lowerSlug.includes('batman') ||
+    lowerSlug.includes('dc') ||
+    lowerSlug.includes('superman');
+  const isAnime =
+    lowerCat.includes('anime') ||
+    lowerSlug.includes('anime') ||
+    lowerSlug.includes('one-piece') ||
+    lowerSlug.includes('naruto') ||
+    lowerSlug.includes('jujutsu');
+  const isKDrama =
+    lowerCat.includes('k-drama') ||
+    lowerCat.includes('kdrama') ||
+    lowerSlug.includes('kdrama') ||
+    lowerSlug.includes('k-drama') ||
+    lowerSlug.includes('oppa');
 
-  let categoryName = 'Marvel';
-  let categoryHref = '/category/marvel';
+  let categoryName = post?.category || 'Marvel';
+  let categoryHref = post?.category
+    ? `/category/${encodeURIComponent(post.category.toLowerCase().replace(/\s+/g, '-'))}`
+    : '/category/marvel';
   let badgeColorStyle = 'text-[#22c55e] bg-[#22c55e]/10 border-[#22c55e]/20';
 
   if (isDC) {
-    categoryName = 'DC';
-    categoryHref = '/category/dc';
+    categoryName = post?.category || 'DC';
+    categoryHref = '/category/dc-comics';
     badgeColorStyle = 'text-[#38bdf8] bg-[#38bdf8]/10 border-[#38bdf8]/20';
   } else if (isAnime) {
-    categoryName = 'Anime';
+    categoryName = post?.category || 'Anime';
     categoryHref = '/category/anime';
     badgeColorStyle = 'text-[#ec4899] bg-[#ec4899]/10 border-[#ec4899]/20';
   } else if (isKDrama) {
-    categoryName = 'K-Drama';
-    categoryHref = '/category/kdrama';
+    categoryName = post?.category || 'K-Drama';
+    categoryHref = '/category/k-drama';
     badgeColorStyle = 'text-[#a855f7] bg-[#a855f7]/10 border-[#a855f7]/20';
   }
 
-  // New interactive states for Views, Likes, and Bookmarks (Save)
+  const heroImage = post?.image_url || post?.image || post?.imageUrl || DEFAULT_HERO_IMAGE;
+  const authorDisplay = post?.author || 'Jane Smith';
+  const dateDisplay = post?.published_on
+    ? new Date(post.published_on).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '4 August 2026';
+  const imageCreditDisplay = post?.image_credit || 'Studios / Editorial';
+
+  // Interactive states for Views, Likes, and Bookmarks (Save)
   const [views, setViews] = useState(1248);
   const [likes, setLikes] = useState(142);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   const handleLike = () => {
+    if (requireLogin()) return;
     if (isLiked) {
-      setLikes(prev => prev - 1);
+      setLikes((prev) => prev - 1);
       setIsLiked(false);
     } else {
-      setLikes(prev => prev + 1);
+      setLikes((prev) => prev + 1);
       setIsLiked(true);
     }
   };
 
   const handleSave = () => {
+    if (requireLogin()) return;
     setIsSaved(!isSaved);
   };
 
@@ -64,7 +154,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     { key: 'dc', label: 'Bat-Signal', icon: '🦇', subtitle: 'DC Comics' },
     { key: 'handheart', label: 'Hand Heart', icon: '🫶', subtitle: 'Love' },
     { key: 'redheart', label: 'Red Heart', icon: '❤️', subtitle: 'Classic' },
-    { key: 'angry', label: 'Angry', icon: '😤', subtitle: 'Angry' }
+    { key: 'angry', label: 'Angry', icon: '😤', subtitle: 'Angry' },
   ];
 
   type ReplyType = {
@@ -110,8 +200,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
           userVotedType: null,
           parentId: 1,
           replyingToAuthor: 'WebHead99',
-        }
-      ]
+        },
+      ],
     },
     {
       id: 2,
@@ -121,19 +211,28 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       time: '5 hours ago',
       vibes: { kdrama: 5, anime: 38, marvel: 12, dc: 6, handheart: 8, redheart: 19, angry: 2 },
       userVotedType: null,
-      replies: []
-    }
+      replies: [],
+    },
   ]);
 
   const [newComment, setNewComment] = useState('');
   const [authorName, setAuthorName] = useState('');
-  
+
+  useEffect(() => {
+    if (user) {
+      const defaultHandle = user.username || user.firstName || user.fullName || '';
+      if (defaultHandle && !authorName) setAuthorName(defaultHandle);
+      if (defaultHandle && !replyAuthor) setReplyAuthor(defaultHandle);
+    }
+  }, [user]);
+
   const [activeReplyTarget, setActiveReplyTarget] = useState<{ commentId: number; targetAuthor: string } | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyAuthor, setReplyAuthor] = useState('');
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (requireLogin()) return;
     if (!newComment.trim() || !authorName.trim()) return;
 
     const initialVibes = vibeOptions.reduce((acc, vibe) => {
@@ -146,21 +245,21 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     const commentObj: CommentType = {
       id: Date.now(),
       author: authorName.trim(),
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName.trim()}`,
+      avatar: user?.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName.trim()}`,
       text: newComment.trim(),
       time: 'Just now',
       vibes: initialVibes,
       userVotedType: 'marvel',
-      replies: []
+      replies: [],
     };
 
     setComments([commentObj, ...comments]);
     setNewComment('');
-    setAuthorName('');
   };
 
   const handleAddReply = (commentId: number, targetAuthor: string, e: React.FormEvent) => {
     e.preventDefault();
+    if (requireLogin()) return;
     if (!replyText.trim() || !replyAuthor.trim()) return;
 
     const initialVibes = vibeOptions.reduce((acc, vibe) => {
@@ -173,7 +272,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     const newReply: ReplyType = {
       id: Date.now(),
       author: replyAuthor.trim(),
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${replyAuthor.trim()}`,
+      avatar: user?.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${replyAuthor.trim()}`,
       text: replyText.trim(),
       time: 'Just now',
       vibes: initialVibes,
@@ -182,60 +281,65 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       replyingToAuthor: targetAuthor,
     };
 
-    setComments(comments.map(c => {
-      if (c.id === commentId) {
-        return { ...c, replies: [...c.replies, newReply] };
-      }
-      return c;
-    }));
+    setComments(
+      comments.map((c) => {
+        if (c.id === commentId) {
+          return { ...c, replies: [...c.replies, newReply] };
+        }
+        return c;
+      })
+    );
 
     setReplyText('');
-    setReplyAuthor('');
     setActiveReplyTarget(null);
   };
 
   const handleVibeVote = (commentId: number, vibeKey: string, replyId?: number) => {
-    setComments(comments.map(c => {
-      if (!replyId && c.id === commentId) {
-        const prevVoted = c.userVotedType;
-        const newVibes: Record<string, number> = { ...c.vibes };
+    if (requireLogin()) return;
 
-        if (prevVoted === vibeKey) {
-          newVibes[vibeKey] = (newVibes[vibeKey] || 0) - 1;
-          return { ...c, userVotedType: null, vibes: newVibes };
-        } else {
-          if (prevVoted) {
-            newVibes[prevVoted] = (newVibes[prevVoted] || 0) - 1;
-          }
-          newVibes[vibeKey] = (newVibes[vibeKey] || 0) + 1;
-          return { ...c, userVotedType: vibeKey, vibes: newVibes };
-        }
-      }
+    setComments(
+      comments.map((c) => {
+        if (!replyId && c.id === commentId) {
+          const prevVoted = c.userVotedType;
+          const newVibes: Record<string, number> = { ...c.vibes };
 
-      if (replyId && c.id === commentId) {
-        const updatedReplies = c.replies.map(r => {
-          if (r.id === replyId) {
-            const prevVoted = r.userVotedType;
-            const newVibes: Record<string, number> = { ...r.vibes };
-
-            if (prevVoted === vibeKey) {
-              newVibes[vibeKey] = (newVibes[vibeKey] || 0) - 1;
-              return { ...r, userVotedType: null, vibes: newVibes };
-            } else {
-              if (prevVoted) {
-                newVibes[prevVoted] = (newVibes[prevVoted] || 0) - 1;
-              }
-              newVibes[vibeKey] = (newVibes[vibeKey] || 0) + 1;
-              return { ...r, userVotedType: vibeKey, vibes: newVibes };
+          if (prevVoted === vibeKey) {
+            newVibes[vibeKey] = (newVibes[vibeKey] || 0) - 1;
+            return { ...c, userVotedType: null, vibes: newVibes };
+          } else {
+            if (prevVoted) {
+              newVibes[prevVoted] = (newVibes[prevVoted] || 0) - 1;
             }
+            newVibes[vibeKey] = (newVibes[vibeKey] || 0) + 1;
+            return { ...c, userVotedType: vibeKey, vibes: newVibes };
           }
-          return r;
-        });
-        return { ...c, replies: updatedReplies };
-      }
+        }
 
-      return c;
-    }));
+        if (replyId && c.id === commentId) {
+          const updatedReplies = c.replies.map((r) => {
+            if (r.id === replyId) {
+              const prevVoted = r.userVotedType;
+              const newVibes: Record<string, number> = { ...r.vibes };
+
+              if (prevVoted === vibeKey) {
+                newVibes[vibeKey] = (newVibes[vibeKey] || 0) - 1;
+                return { ...r, userVotedType: null, vibes: newVibes };
+              } else {
+                if (prevVoted) {
+                  newVibes[prevVoted] = (newVibes[prevVoted] || 0) - 1;
+                }
+                newVibes[vibeKey] = (newVibes[vibeKey] || 0) + 1;
+                return { ...r, userVotedType: vibeKey, vibes: newVibes };
+              }
+            }
+            return r;
+          });
+          return { ...c, replies: updatedReplies };
+        }
+
+        return c;
+      })
+    );
   };
 
   return (
@@ -245,13 +349,13 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
           <div className="w-[130%] -ml-[15%] space-y-4">
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center space-x-3">
-                <Link 
-                  href={categoryHref} 
+                <Link
+                  href={categoryHref}
                   className={`font-bold uppercase tracking-wider px-3 py-1 rounded-full border hover:underline ${badgeColorStyle}`}
                 >
                   {categoryName}
                 </Link>
-                <span className="text-zinc-400">4 August 2026</span>
+                <span className="text-zinc-400">{dateDisplay}</span>
               </div>
 
               {/* Engagement Stats Bar (Views, Likes, Save Button) */}
@@ -265,8 +369,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                 <button
                   onClick={handleLike}
                   className={`flex items-center space-x-1.5 px-3 py-1 rounded-full border transition cursor-pointer ${
-                    isLiked 
-                      ? 'bg-red-500/10 border-red-500/40 text-red-400' 
+                    isLiked
+                      ? 'bg-red-500/10 border-red-500/40 text-red-400'
                       : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -278,8 +382,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                 <button
                   onClick={handleSave}
                   className={`flex items-center space-x-1.5 px-3 py-1 rounded-full border transition cursor-pointer ${
-                    isSaved 
-                      ? 'bg-[#b5ff42]/10 border-[#b5ff42]/50 text-[#b5ff42]' 
+                    isSaved
+                      ? 'bg-[#b5ff42]/10 border-[#b5ff42]/50 text-[#b5ff42]'
                       : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                   }`}
                   title={isSaved ? 'Saved to bookmarks' : 'Save article'}
@@ -297,18 +401,24 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
             <div className="flex items-center space-x-2 pt-2 text-sm text-zinc-400 border-t border-zinc-900">
               <span>Authored By:</span>
               <Link href="/author/jane-smith" className="text-white font-medium hover:text-[#b5ff42] transition">
-                Jane Smith
+                {authorDisplay}
               </Link>
             </div>
           </div>
 
-          <div className="w-[130%] -ml-[15%] h-[336px] md:h-[472px] rounded-2xl overflow-hidden relative border border-zinc-800 shadow-2xl">
-            <div 
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('https://images.unsplash.com/photo-1635863138275-d9b33297680b?q=80&w=1600&auto=format&fit=crop')` }}
-            ></div>
+          <div className="w-[130%] -ml-[15%] h-[336px] md:h-[472px] rounded-2xl overflow-hidden relative border border-zinc-800 shadow-2xl bg-zinc-900">
+            {isLoadingPost ? (
+              <div className="w-full h-full flex items-center justify-center text-zinc-500 text-sm">
+                Loading image...
+              </div>
+            ) : (
+              <div
+                className="w-full h-full bg-cover bg-center"
+                style={{ backgroundImage: `url('${heroImage}')` }}
+              ></div>
+            )}
             <div className="absolute bottom-3 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-md text-xs text-zinc-300 border border-zinc-700/50">
-              Image Credit: Studios / Editorial
+              Image Credit: {imageCreditDisplay}
             </div>
           </div>
         </div>
@@ -318,22 +428,29 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
             <div className="bg-black border border-zinc-900 rounded-3xl p-8 md:p-12 shadow-2xl">
               <div className="prose prose-invert max-w-none text-zinc-300 space-y-6 text-base md:text-lg leading-relaxed">
                 <p className="font-medium text-white text-lg md:text-xl">
-                  {formattedTitle} is making waves across fandoms everywhere, representing a massive shift in how modern storytelling handles legacy characters and high-stakes cinematic universes.
+                  {post?.short_description ||
+                    `${formattedTitle} is making waves across fandoms everywhere, representing a massive shift in how modern storytelling handles legacy characters and high-stakes cinematic universes.`}
                 </p>
 
-                <h2 className="text-2xl font-bold text-white pt-4">Origins and Narrative Impact</h2>
-                <p>
-                  When analyzing the core premise, creators have consistently pushed boundaries to redefine what fans expect. By introducing subtle narrative cues, storytellers lay down foundational elements that impact the entire franchise landscape.
-                </p>
+                {post?.content ? (
+                  <div className="whitespace-pre-line text-zinc-300">{post.content}</div>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold text-white pt-4">Origins and Narrative Impact</h2>
+                    <p>
+                      When analyzing the core premise, creators have consistently pushed boundaries to redefine what fans expect. By introducing subtle narrative cues, storytellers lay down foundational elements that impact the entire franchise landscape.
+                    </p>
 
-                <div className="bg-[#121212] border-l-4 border-[#b5ff42] p-6 rounded-r-xl my-6 text-zinc-300 italic text-base">
-                  &quot;Every choice echoes across multiple timelines, creating ripples that change the direction of the entire universe.&quot;
-                </div>
+                    <div className="bg-[#121212] border-l-4 border-[#b5ff42] p-6 rounded-r-xl my-6 text-zinc-300 italic text-base">
+                      &quot;Every choice echoes across multiple timelines, creating ripples that change the direction of the entire universe.&quot;
+                    </div>
 
-                <h2 className="text-2xl font-bold text-white pt-4">What Comes Next</h2>
-                <p>
-                  As new details emerge, keeping track of background lore and hidden clues will be essential for fans looking to stay ahead of upcoming releases and narrative shifts.
-                </p>
+                    <h2 className="text-2xl font-bold text-white pt-4">What Comes Next</h2>
+                    <p>
+                      As new details emerge, keeping track of background lore and hidden clues will be essential for fans looking to stay ahead of upcoming releases and narrative shifts.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -359,42 +476,59 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                 </h3>
               </div>
 
-              <form onSubmit={handleAddComment} className="space-y-4 bg-[#0a0a0a] p-5 rounded-2xl border border-zinc-900">
-                <input
-                  type="text"
-                  placeholder="Your Fandom Handle / Name..."
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="w-full md:w-1/2 bg-black border border-zinc-800 focus:border-[#22c55e] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition"
-                  required
-                />
-                <textarea
-                  placeholder="Drop your theory or thoughts here..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={3}
-                  className="w-full bg-black border border-zinc-800 focus:border-[#22c55e] rounded-xl p-4 text-sm text-white placeholder-zinc-600 outline-none transition resize-none"
-                  required
-                ></textarea>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="bg-white hover:bg-zinc-200 text-black font-semibold px-6 py-2 rounded-xl text-sm transition shadow-lg cursor-pointer"
+              {isLoaded && !isSignedIn ? (
+                <div className="bg-[#0a0a0a] p-6 rounded-2xl border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-white">Sign in to join the discussion</p>
+                    <p className="text-xs text-zinc-400">
+                      Log in to post theories, reply to comments, and vote on vibes.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/sign-in?redirect_url=${encodeURIComponent(pathname || `/posts/${slug}`)}`}
+                    className="bg-[#b5ff42] hover:bg-[#a3ef2e] text-black font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition text-center shrink-0"
                   >
-                    Publish Theory
-                  </button>
+                    Login to Comment
+                  </Link>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleAddComment} className="space-y-4 bg-[#0a0a0a] p-5 rounded-2xl border border-zinc-900">
+                  <input
+                    type="text"
+                    placeholder="Your Fandom Handle / Name..."
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    className="w-full md:w-1/2 bg-black border border-zinc-800 focus:border-[#22c55e] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition"
+                    required
+                  />
+                  <textarea
+                    placeholder="Drop your theory or thoughts here..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={3}
+                    className="w-full bg-black border border-zinc-800 focus:border-[#22c55e] rounded-xl p-4 text-sm text-white placeholder-zinc-600 outline-none transition resize-none"
+                    required
+                  ></textarea>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="bg-white hover:bg-zinc-200 text-black font-semibold px-6 py-2 rounded-xl text-sm transition shadow-lg cursor-pointer"
+                    >
+                      Publish Theory
+                    </button>
+                  </div>
+                </form>
+              )}
 
               <div className="space-y-6">
                 {comments.map((comment) => (
                   <div key={comment.id} className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-5 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
-                        <img 
-                          src={comment.avatar} 
-                          alt={comment.author} 
-                          className="w-10 h-10 rounded-full border border-zinc-800 bg-zinc-900 object-cover" 
+                        <img
+                          src={comment.avatar}
+                          alt={comment.author}
+                          className="w-10 h-10 rounded-full border border-zinc-800 bg-zinc-900 object-cover"
                         />
                         <div>
                           <span className="font-bold text-sm text-white">{comment.author}</span>
@@ -433,12 +567,15 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                       </div>
 
                       <div className="flex justify-end pt-1">
-                        <button 
-                          onClick={() => setActiveReplyTarget(
-                            activeReplyTarget?.commentId === comment.id && activeReplyTarget?.targetAuthor === comment.author
-                              ? null 
-                              : { commentId: comment.id, targetAuthor: comment.author }
-                          )}
+                        <button
+                          onClick={() => {
+                            if (requireLogin()) return;
+                            setActiveReplyTarget(
+                              activeReplyTarget?.commentId === comment.id && activeReplyTarget?.targetAuthor === comment.author
+                                ? null
+                                : { commentId: comment.id, targetAuthor: comment.author }
+                            );
+                          }}
                           className="text-zinc-400 hover:text-white transition font-medium text-xs cursor-pointer"
                         >
                           Reply
@@ -490,24 +627,24 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                         {comment.replies.map((reply) => (
                           <div key={reply.id} className="space-y-3 bg-black/40 p-4 rounded-xl border border-zinc-900/50">
                             <div className="flex items-center space-x-3">
-                              <img 
-                                src={reply.avatar} 
-                                alt={reply.author} 
-                                className="w-8 h-8 rounded-full border border-zinc-800 bg-zinc-900 object-cover" 
+                              <img
+                                src={reply.avatar}
+                                alt={reply.author}
+                                className="w-8 h-8 rounded-full border border-zinc-800 bg-zinc-900 object-cover"
                               />
                               <div>
                                 <span className="font-bold text-xs text-white">{reply.author}</span>
                                 <span className="text-[10px] text-zinc-500 block">{reply.time}</span>
                               </div>
                             </div>
-                            
+
                             <div className="text-zinc-300 text-xs leading-relaxed pl-11 space-y-1">
                               <span className="inline-block text-[#b5ff42] font-medium mr-1.5">
                                 @{reply.replyingToAuthor}
                               </span>
                               <span>{reply.text}</span>
                             </div>
-                            
+
                             <div className="flex items-center justify-between pl-11 pt-1">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 {vibeOptions.map((vibe) => {
@@ -531,12 +668,15 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                                 })}
                               </div>
 
-                              <button 
-                                onClick={() => setActiveReplyTarget(
-                                  activeReplyTarget?.commentId === comment.id && activeReplyTarget?.targetAuthor === reply.author
-                                    ? null 
-                                    : { commentId: comment.id, targetAuthor: reply.author }
-                                )}
+                              <button
+                                onClick={() => {
+                                  if (requireLogin()) return;
+                                  setActiveReplyTarget(
+                                    activeReplyTarget?.commentId === comment.id && activeReplyTarget?.targetAuthor === reply.author
+                                      ? null
+                                      : { commentId: comment.id, targetAuthor: reply.author }
+                                  );
+                                }}
                                 className="text-zinc-400 hover:text-white transition font-medium text-xs cursor-pointer"
                               >
                                 Reply
