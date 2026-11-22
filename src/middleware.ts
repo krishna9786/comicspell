@@ -6,7 +6,6 @@ const isProtectedRoute = createRouteMatcher([
   '/roles(.*)',
   '/careers(.*)',
   '/view-all-roles(.*)',
-  '/user-profile(.*)',
   '/api/write-for-us(.*)',
   '/api/upload(.*)',
 ]);

@@ -4,6 +4,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+function nameToSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // Category quick navigation cards
 const categoryCards = [
   {
@@ -202,6 +210,8 @@ export default function Home() {
                 const postDate = article.published_on
                   ? new Date(article.published_on).toLocaleDateString('en-GB')
                   : article.date || (article.created_at ? new Date(article.created_at).toLocaleDateString() : '');
+                const authorName = article.author || 'Admin';
+                const authorHref = `/user-profile/${encodeURIComponent(nameToSlug(authorName) || 'admin')}`;
 
                 return (
                   <div
@@ -254,10 +264,10 @@ export default function Home() {
                       <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
                         Authored By:{' '}
                         <Link
-                          href={article.authorSlug || '#'}
+                          href={authorHref}
                           className="text-zinc-200 font-medium hover:text-[#b5ff42] transition-colors z-10 relative"
                         >
-                          {article.author || 'Admin'}
+                          {authorName}
                         </Link>
                       </div>
                     </div>

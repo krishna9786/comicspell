@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
+function nameToSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // Fallback metadata for category headers/backgrounds if needed
 const categoryMeta: Record<string, { title: string; description: string; image: string }> = {
   marvel: {
@@ -104,6 +112,8 @@ export default function CategoryDynamicPage() {
                   ? new Date(article.published_on).toLocaleDateString('en-GB')
                   : article.date || '';
                 const postHref = article.slug ? `/posts/${article.slug}` : `/posts/${article.id}`;
+                const authorName = article.author || 'Admin';
+                const authorHref = `/user-profile/${encodeURIComponent(nameToSlug(authorName) || 'admin')}`;
 
                 return (
                   <div
@@ -137,8 +147,8 @@ export default function CategoryDynamicPage() {
                       </div>
                       <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80">
                         Authored By:{' '}
-                        <Link href={article.authorSlug || '#'} className="text-zinc-200 font-medium hover:text-[#b5ff42]">
-                          {article.author || 'Admin'}
+                        <Link href={authorHref} className="text-zinc-200 font-medium hover:text-[#b5ff42]">
+                          {authorName}
                         </Link>
                       </div>
                     </div>

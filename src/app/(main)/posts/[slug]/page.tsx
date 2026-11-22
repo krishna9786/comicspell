@@ -10,6 +10,14 @@ import React from 'react';
 const DEFAULT_HERO_IMAGE =
   'https://images.unsplash.com/photo-1635863138275-d9b33297680b?q=80&w=1600&auto=format&fit=crop';
 
+function nameToSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = React.use(params);
   const slug = resolvedParams.slug;
@@ -116,6 +124,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   const heroImage = post?.image_url || post?.image || post?.imageUrl || DEFAULT_HERO_IMAGE;
   const authorDisplay = post?.author || 'Jane Smith';
+  const authorHref = `/user-profile/${encodeURIComponent(nameToSlug(authorDisplay) || 'admin')}`;
   const dateDisplay = post?.published_on
     ? new Date(post.published_on).toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -400,7 +409,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
             <div className="flex items-center space-x-2 pt-2 text-sm text-zinc-400 border-t border-zinc-900">
               <span>Authored By:</span>
-              <Link href="/author/jane-smith" className="text-white font-medium hover:text-[#b5ff42] transition">
+              <Link href={authorHref} className="text-white font-medium hover:text-[#b5ff42] transition">
                 {authorDisplay}
               </Link>
             </div>
