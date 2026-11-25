@@ -6,9 +6,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import React from 'react';
+import { getEmbedVideoUrl } from '@/components/WriteForUsClient';
 
 const DEFAULT_HERO_IMAGE =
   'https://images.unsplash.com/photo-1635863138275-d9b33297680b?q=80&w=1600&auto=format&fit=crop';
+
+const ENDING_TAG = '#behappy ✌️';
 
 function nameToSlug(name: string) {
   return name
@@ -16,6 +19,135 @@ function nameToSlug(name: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function renderInlineFormatting(text: string) {
+  const tokens = text
+    .split(/(\[[^\]]+\]\([^\s)]+\)|https?:\/\/[^\s)]+|\*\*[^*]+\*\*|\*[^*]+\*|~[^~]+~)/g)
+    .filter(Boolean);
+
+  return tokens.map((part, idx) => {
+    const mdLinkMatch = part.match(/^\[([^\]]+)\]\(([^\s)]+)\)$/);
+    if (mdLinkMatch) {
+      return (
+        <a
+          key={idx}
+          href={mdLinkMatch[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange-400 hover:text-orange-300 underline font-medium"
+        >
+          {mdLinkMatch[1]}
+        </a>
+      );
+    }
+
+    if (/^https?:\/\/[^\s)]+$/.test(part)) {
+      return (
+        <a
+          key={idx}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange-400 hover:text-orange-300 underline font-medium break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+
+    if (/^\*\*[^*]+\*\*$/.test(part)) {
+      return (
+        <strong key={idx} className="font-bold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (/^\*[^*]+\*$/.test(part)) {
+      return (
+        <em key={idx} className="italic text-zinc-200">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    if (/^~[^~]+~$/.test(part)) {
+      return (
+        <span key={idx} className="underline decoration-[#b5ff42]">
+          {part.slice(1, -1)}
+        </span>
+      );
+    }
+
+    return <React.Fragment key={idx}>{part}</React.Fragment>;
+  });
+}
+
+function renderArticleBody(rawContent: string) {
+  const normalized = /\n*#behappy\s*✌️\s*$/i.test(rawContent.trimEnd())
+    ? rawContent.trimEnd()
+    : `${rawContent.trimEnd()}\n\n${ENDING_TAG}`;
+
+  return normalized.split('\n').map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={i} className="h-3" />;
+
+    const collageMatch = trimmed.match(/^\[COLLAGE:\s*(.+)\]$/);
+    if (collageMatch) {
+      const urls = collageMatch[1]
+        .split('|')
+        .map((u) => u.trim())
+        .filter(Boolean)
+        .slice(0, 7);
+
+      const gridCols =
+        urls.length === 1
+          ? 'grid-cols-1'
+          : urls.length === 2 || urls.length === 4
+          ? 'grid-cols-2'
+          : 'grid-cols-2 sm:grid-cols-3';
+
+      return (
+        <div
+          key={i}
+          className="my-5 p-4 rounded-2xl bg-[#141414] border border-zinc-800 space-y-2.5"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wider text-orange-400">
+            Collage ({urls.length}/7)
+          </p>
+          <div className={`grid ${gridCols} gap-3`}>
+            {urls.map((src, idx) => (
+              <div
+                key={idx}
+                className="rounded-xl overflow-hidden border border-zinc-800 bg-black aspect-video"
+              >
+                <img
+                  src={src}
+                  alt={`Collage item ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (/^#{1,6}\s+/.test(trimmed)) {
+      return (
+        <h2 key={i} className="text-2xl font-extrabold text-white pt-4 pb-1">
+          {renderInlineFormatting(trimmed.replace(/^#{1,6}\s+/, ''))}
+        </h2>
+      );
+    }
+
+    return (
+      <p key={i} className="text-zinc-300 leading-relaxed">
+        {renderInlineFormatting(line)}
+      </p>
+    );
+  });
 }
 
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -133,6 +265,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       })
     : '4 August 2026';
   const imageCreditDisplay = post?.image_credit || 'Studios / Editorial';
+  const embedSrc = getEmbedVideoUrl(post?.video_url || post?.videoUrl || '');
 
   // Interactive states for Views, Likes, and Bookmarks (Save)
   const [views, setViews] = useState(1248);
@@ -226,6 +359,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   const [newComment, setNewComment] = useState('');
   const [authorName, setAuthorName] = useState('');
+  const [replyAuthor, setReplyAuthor] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -237,7 +371,6 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   const [activeReplyTarget, setActiveReplyTarget] = useState<{ commentId: number; targetAuthor: string } | null>(null);
   const [replyText, setReplyText] = useState('');
-  const [replyAuthor, setReplyAuthor] = useState('');
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,15 +567,15 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] lg:gap-36 pt-4">
           <div className="w-[182%] -ml-[25%] space-y-8">
-            <div className="bg-black border border-zinc-900 rounded-3xl p-8 md:p-12 shadow-2xl">
-              <div className="prose prose-invert max-w-none text-zinc-300 space-y-6 text-base md:text-lg leading-relaxed">
+            <div className="bg-black border border-zinc-900 rounded-3xl p-8 md:p-12 shadow-2xl space-y-6">
+              <div className="max-w-none text-zinc-300 space-y-4 text-base md:text-lg leading-relaxed">
                 <p className="font-medium text-white text-lg md:text-xl">
                   {post?.short_description ||
                     `${formattedTitle} is making waves across fandoms everywhere, representing a massive shift in how modern storytelling handles legacy characters and high-stakes cinematic universes.`}
                 </p>
 
                 {post?.content ? (
-                  <div className="whitespace-pre-line text-zinc-300">{post.content}</div>
+                  <div className="space-y-2">{renderArticleBody(post.content)}</div>
                 ) : (
                   <>
                     <h2 className="text-2xl font-bold text-white pt-4">Origins and Narrative Impact</h2>
@@ -451,14 +584,33 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                     </p>
 
                     <div className="bg-[#121212] border-l-4 border-[#b5ff42] p-6 rounded-r-xl my-6 text-zinc-300 italic text-base">
-                      &quot;Every choice echoes across multiple timelines, creating ripples that change the direction of the entire universe.&quot;
+                      &ldquo;Every choice echoes across multiple timelines, creating ripples that change the direction of the entire universe.&rdquo;
                     </div>
 
                     <h2 className="text-2xl font-bold text-white pt-4">What Comes Next</h2>
                     <p>
                       As new details emerge, keeping track of background lore and hidden clues will be essential for fans looking to stay ahead of upcoming releases and narrative shifts.
                     </p>
+
+                    <p className="pt-2">{ENDING_TAG}</p>
                   </>
+                )}
+
+                {embedSrc && (
+                  <div className="pt-6 space-y-2.5">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#b5ff42]">
+                      Trailer / Video
+                    </h3>
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden border border-zinc-800 bg-black">
+                      <iframe
+                        src={embedSrc}
+                        title="Article video trailer"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

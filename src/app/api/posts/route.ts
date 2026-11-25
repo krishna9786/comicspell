@@ -137,6 +137,81 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PUT: Update an existing article's content/metadata
+export async function PUT(req: NextRequest) {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      id,
+      title,
+      slug,
+      short_description,
+      description,
+      image_url,
+      image,
+      image_credit,
+      category,
+      author,
+      content,
+      is_published,
+      status,
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+    }
+
+    const publishedFlag =
+      typeof is_published === 'boolean' ? is_published : status === 'published';
+
+    const query = `
+      UPDATE posts
+      SET
+        title = COALESCE($1, title),
+        slug = COALESCE($2, slug),
+        short_description = COALESCE($3, short_description),
+        author = COALESCE($4, author),
+        image_url = COALESCE($5, image_url),
+        image_credit = COALESCE($6, image_credit),
+        category = COALESCE($7, category),
+        content = COALESCE($8, content),
+        is_published = COALESCE($9, is_published)
+      WHERE id = $10
+      RETURNING *;
+    `;
+
+    const values = [
+      title || null,
+      slug || null,
+      short_description ?? description ?? null,
+      author || null,
+      image_url ?? image ?? null,
+      image_credit ?? null,
+      category || null,
+      content ?? null,
+      typeof is_published === 'boolean' || status ? publishedFlag : null,
+      id,
+    ];
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, post: result.rows[0] }, { status: 200 });
+  } catch (error) {
+    console.error('Error updating post:', error);
+    return NextResponse.json({ error: 'Failed to update post' }, { status: 500 });
+  }
+}
+
 // PATCH: Update Publish / Draft status when clicking "Publish Article" in Admin
 export async function PATCH(req: NextRequest) {
   try {

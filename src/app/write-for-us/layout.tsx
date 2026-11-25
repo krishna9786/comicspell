@@ -23,14 +23,8 @@ export default function WriteForUsLayout({
           </div>
           
           <div className="flex items-center space-x-4 font-medium text-zinc-400">
-            <Link href="/write-for-us/guidelines" target="_blank" rel="noopener noreferrer" className="hover:text-[#b5ff42] transition hidden md:inline">
-              Guidelines to Improve
-            </Link>
-            <Link href="/write-for-us/lore" target="_blank" rel="noopener noreferrer" className="hover:text-[#b5ff42] transition hidden md:inline">
-              Lore & Continuity Rulebook
-            </Link>
             <Link href="/write-for-us/formatting" target="_blank" rel="noopener noreferrer" className="hover:text-[#b5ff42] transition hidden md:inline">
-              Guidelines to Write
+              Guidelines & Rules to Write
             </Link>
             <Link
               href="/"
